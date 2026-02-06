@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Checkout</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header"><div class="container"><a class="brand" href="index.html">ClubLocker</a><nav><a href="index.html">Home</a><a href="cart.html">Cart</a></nav></div></header>
+    <main class="container" style="padding-top:20px">
+      <h1>Checkout</h1>
+      <div id="checkout-area">
+        <p class="muted">Review your cart and enter shipping details. You will be redirected to a secure Stripe Checkout page to pay (Visa/cards accepted).</p>
+        <div id="cart-summary" style="margin-top:12px"></div>
+
+        <form id="checkout-form" style="margin-top:16px">
+          <label>Full name<br><input id="name" required></label><br><br>
+          <label>Email<br><input id="email" type="email" required></label><br><br>
+          <label>Shipping address<br><input id="address" required></label><br><br>
+          <button class="btn primary" id="pay">Pay with Stripe</button>
+        </form>
+      </div>
+    </main>
+    <footer class="site-footer"><div class="container">© Demo — ClubLocker lookalike</div></footer>
+    <script>
+      async function loadSummary(){
+        const cart = JSON.parse(localStorage.getItem('clublocker_cart') || '[]');
+        const res = await fetch('products.json');
+        const products = await res.json();
+        const container = document.getElementById('cart-summary');
+        if(cart.length===0){ container.innerHTML = '<p>Your cart is empty.</p>'; return }
+        let html = '<div class="grid">';
+        let total = 0;
+        cart.forEach(item=>{
+          const p = products.find(x=>String(x.id)===String(item.id));
+          if(!p) return;
+          total += p.price * item.qty;
+          html += `<div class="card"><img src="${p.image}" alt="${p.name}"><h3>${p.name}</h3><div class="muted">Qty: ${item.qty}</div><div class="price">${'$'+(p.price).toFixed(2)}</div></div>`;
+        });
+        html += `</div><div style="margin-top:12px;font-weight:700">Total: $${total.toFixed(2)}</div>`;
+        container.innerHTML = html;
+      }
+
+      document.addEventListener('DOMContentLoaded',()=>{
+        loadSummary();
+        document.getElementById('checkout-form').addEventListener('submit',async (e)=>{
+          e.preventDefault();
+          const name = document.getElementById('name').value;
+          const email = document.getElementById('email').value;
+          const address = document.getElementById('address').value;
+          const cart = JSON.parse(localStorage.getItem('clublocker_cart') || '[]');
+          if(cart.length===0){ alert('Cart is empty'); return }
+          const resp = await fetch('/create-checkout-session',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({cart,customer:{name,email,address}})
+          });
+          if(!resp.ok){ const t = await resp.text(); alert('Error creating session: '+t); return }
+          const data = await resp.json();
+          // Redirect to Stripe Checkout URL returned by server
+          window.location = data.url;
+        });
+      });
+    </script>
+  </body>
+</html>
